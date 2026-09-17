@@ -3,7 +3,7 @@ export type ProjectStatus = "active" | "paused" | "completed" | "archived";
 
 export interface Tag { id: string; name: string; parentId: string | null; type: "system" | "custom"; createdAt: string; updatedAt: string; }
 export interface Idea { id: string; title: string; content: string; tagIds: string[]; status: IdeaStatus; createdAt: string; updatedAt: string; }
-export interface Project { id: string; title: string; description: string; status: ProjectStatus; linkedIdeaId: string; createdAt: string; updatedAt: string; }
+export interface Project { id: string; title: string; description: string; innerThoughts?: string; status: ProjectStatus; linkedIdeaId: string; createdAt: string; updatedAt: string; }
 type LegacyIdea = Partial<Idea> & { category?: string; tags?: string[] };
 
 const IDEAS_KEY = "ariadne:ideas";
