@@ -5,7 +5,9 @@ export interface Tag { id: string; name: string; parentId: string | null; type: 
 export interface Idea { id: string; title: string; content: string; tagIds: string[]; status: IdeaStatus; createdAt: string; updatedAt: string; }
 export interface Project { id: string; title: string; description: string; innerThoughts?: string; status: ProjectStatus; linkedIdeaId?: string; createdAt: string; updatedAt: string; }
 export interface ProjectMessage { id: string; projectId: string; role: "user" | "assistant"; content: string; createdAt: string; }
-export interface ActivityRecord { id: string; title: string; minutes: number; tagId: string | null; projectId?: string | null; note?: string; completedAt: string; }
+export interface ActivityRecord { id: string; title: string; minutes: number; tagId: string | null; projectId?: string | null; note?: string; startedAt?: string; completedAt: string; }
+export interface LlmConfig { provider: "deepseek" | "openai" | "qwen" | "kimi" | "custom"; apiKey: string; baseUrl: string; model: string; }
+export interface ActiveTimer { projectId: string; startedAt: string; }
 type LegacyIdea = Partial<Idea> & { category?: string; tags?: string[] };
 
 const IDEAS_KEY = "ariadne:ideas";
@@ -13,18 +15,22 @@ const TAGS_KEY = "ariadne:tags";
 const PROJECTS_KEY = "ariadne:projects";
 const ACTIVITY_RECORDS_KEY = "ariadne:activity-records";
 const PROJECT_MESSAGES_KEY = "ariadne:project-messages";
+const LLM_CONFIG_KEY = "ariadne:llm-config";
+const ACTIVE_TIMER_KEY = "ariadne:active-timer";
 const timestamp = () => new Date().toISOString();
 
-export const systemTags: Tag[] = [
+const systemTagSeed: [string, string, string | null][] = [
   ["learning", "学习", null], ["learning-ai", "AI", "learning"], ["learning-programming", "编程", "learning"], ["learning-japanese", "日语", "learning"], ["learning-reading", "阅读", "learning"],
   ["creation", "创作", null], ["creation-web-app", "Web App", "creation"], ["creation-writing", "写作", "creation"], ["creation-music", "音乐", "creation"], ["creation-visual", "视觉", "creation"],
   ["experience", "体验", null], ["experience-travel", "旅行", "experience"], ["experience-social", "社交", "experience"], ["experience-offline", "线下活动", "experience"],
   ["life", "生活", null], ["life-fitness", "健身", "life"], ["life-organization", "整理", "life"], ["life-daily", "日常", "life"],
-].map(([id, name, parentId]) => ({ id, name, parentId, type: "system" as const, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }));
+];
+export const systemTags: Tag[] = systemTagSeed.map(([id, name, parentId]) => ({ id, name, parentId, type: "system" as const, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }));
 
 function isBrowser() { return typeof window !== "undefined"; }
 function read<T>(key: string): T[] { if (!isBrowser()) return []; try { const value = window.localStorage.getItem(key); const parsed: unknown = value ? JSON.parse(value) : []; return Array.isArray(parsed) ? parsed as T[] : []; } catch { return []; } }
 function write<T>(key: string, value: T[]) { if (isBrowser()) window.localStorage.setItem(key, JSON.stringify(value)); }
+function readObject<T>(key: string): T | null { if (!isBrowser()) return null; try { const value = window.localStorage.getItem(key); return value ? JSON.parse(value) as T : null; } catch { return null; } }
 
 export function getTags(): Tag[] { const stored = read<Tag>(TAGS_KEY); if (!stored.length) { saveTags(systemTags); return systemTags; } return stored; }
 export function saveTags(tags: Tag[]) { write(TAGS_KEY, tags); }
@@ -58,3 +64,9 @@ export function createActivityRecord(input: Omit<ActivityRecord, "id">): Activit
 export function getProjectMessages(): ProjectMessage[] { return read<ProjectMessage>(PROJECT_MESSAGES_KEY).filter((message) => typeof message.projectId === "string" && (message.role === "user" || message.role === "assistant") && typeof message.content === "string" && typeof message.createdAt === "string"); }
 export function saveProjectMessages(messages: ProjectMessage[]) { write(PROJECT_MESSAGES_KEY, messages); }
 export function createProjectMessage(input: Omit<ProjectMessage, "id" | "createdAt">): ProjectMessage { return { ...input, id: crypto.randomUUID(), createdAt: timestamp() }; }
+
+export const defaultLlmConfig: LlmConfig = { provider: "deepseek", apiKey: "", baseUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-chat" };
+export function getLlmConfig(): LlmConfig { return { ...defaultLlmConfig, ...(readObject<LlmConfig>(LLM_CONFIG_KEY) ?? {}) }; }
+export function saveLlmConfig(config: LlmConfig) { if (isBrowser()) window.localStorage.setItem(LLM_CONFIG_KEY, JSON.stringify(config)); }
+export function getActiveTimer(): ActiveTimer | null { const timer = readObject<ActiveTimer>(ACTIVE_TIMER_KEY); return timer && typeof timer.projectId === "string" && typeof timer.startedAt === "string" ? timer : null; }
+export function saveActiveTimer(timer: ActiveTimer | null) { if (!isBrowser()) return; if (timer) window.localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(timer)); else window.localStorage.removeItem(ACTIVE_TIMER_KEY); }
