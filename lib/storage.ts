@@ -3,14 +3,16 @@ export type ProjectStatus = "active" | "paused" | "completed" | "archived";
 
 export interface Tag { id: string; name: string; parentId: string | null; type: "system" | "custom"; createdAt: string; updatedAt: string; }
 export interface Idea { id: string; title: string; content: string; tagIds: string[]; status: IdeaStatus; createdAt: string; updatedAt: string; }
-export interface Project { id: string; title: string; description: string; innerThoughts?: string; status: ProjectStatus; linkedIdeaId: string; createdAt: string; updatedAt: string; }
-export interface ActivityRecord { id: string; title: string; minutes: number; tagId: string | null; completedAt: string; }
+export interface Project { id: string; title: string; description: string; innerThoughts?: string; status: ProjectStatus; linkedIdeaId?: string; createdAt: string; updatedAt: string; }
+export interface ProjectMessage { id: string; projectId: string; role: "user" | "assistant"; content: string; createdAt: string; }
+export interface ActivityRecord { id: string; title: string; minutes: number; tagId: string | null; projectId?: string | null; note?: string; completedAt: string; }
 type LegacyIdea = Partial<Idea> & { category?: string; tags?: string[] };
 
 const IDEAS_KEY = "ariadne:ideas";
 const TAGS_KEY = "ariadne:tags";
 const PROJECTS_KEY = "ariadne:projects";
 const ACTIVITY_RECORDS_KEY = "ariadne:activity-records";
+const PROJECT_MESSAGES_KEY = "ariadne:project-messages";
 const timestamp = () => new Date().toISOString();
 
 export const systemTags: Tag[] = [
@@ -53,3 +55,6 @@ export function createProject(input: Omit<Project, "id" | "createdAt" | "updated
 export function getActivityRecords(): ActivityRecord[] { return read<ActivityRecord>(ACTIVITY_RECORDS_KEY).filter((record) => typeof record.title === "string" && Number.isFinite(record.minutes) && record.minutes > 0 && typeof record.completedAt === "string"); }
 export function saveActivityRecords(records: ActivityRecord[]) { write(ACTIVITY_RECORDS_KEY, records); }
 export function createActivityRecord(input: Omit<ActivityRecord, "id">): ActivityRecord { return { ...input, id: crypto.randomUUID() }; }
+export function getProjectMessages(): ProjectMessage[] { return read<ProjectMessage>(PROJECT_MESSAGES_KEY).filter((message) => typeof message.projectId === "string" && (message.role === "user" || message.role === "assistant") && typeof message.content === "string" && typeof message.createdAt === "string"); }
+export function saveProjectMessages(messages: ProjectMessage[]) { write(PROJECT_MESSAGES_KEY, messages); }
+export function createProjectMessage(input: Omit<ProjectMessage, "id" | "createdAt">): ProjectMessage { return { ...input, id: crypto.randomUUID(), createdAt: timestamp() }; }
