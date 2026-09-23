@@ -25,10 +25,10 @@ const providerPresets: Record<LlmConfig["provider"], Pick<LlmConfig, "baseUrl" |
   custom: { baseUrl: "", model: "" },
 };
 
-async function askLlm(config: LlmConfig, system: string, messages: ChatMessage[]) {
+async function askLlm(config: LlmConfig, system: string, messages: ChatMessage[], temperature = 0.7) {
   if (!config.apiKey.trim()) throw new Error("missing-key");
   if (!config.baseUrl.trim() || !config.model.trim()) throw new Error("missing-model");
-  const response = await fetch(config.baseUrl.trim(), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey.trim()}` }, body: JSON.stringify({ model: config.model.trim(), messages: [{ role: "system", content: system }, ...messages], temperature: 0.7 }) });
+  const response = await fetch(config.baseUrl.trim(), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey.trim()}` }, body: JSON.stringify({ model: config.model.trim(), messages: [{ role: "system", content: system }, ...messages], temperature }) });
   const data = await response.json() as { choices?: { message?: { content?: string } }[]; error?: { message?: string } | string };
   const answer = data.choices?.[0]?.message?.content?.trim();
   if (!response.ok || !answer) throw new Error(typeof data.error === "string" ? data.error : data.error?.message ?? "empty-response");
@@ -37,6 +37,16 @@ async function askLlm(config: LlmConfig, system: string, messages: ChatMessage[]
 
 function dateLabel(value: string) { return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(new Date(value)); }
 function ideaTitle(content: string) { const normalized = content.replace(/\s+/g, " ").trim(); return normalized.length > 48 ? `${normalized.slice(0, 48)}…` : normalized; }
+function parseOrganizedIdea(value: string): Pick<Idea, "title" | "content"> {
+  const cleaned = value.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("invalid-idea-draft");
+  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as { title?: unknown; content?: unknown };
+  if (typeof parsed.title !== "string" || typeof parsed.content !== "string") throw new Error("invalid-idea-draft");
+  const title = parsed.title.replace(/\s+/g, " ").trim().slice(0, 48); const content = parsed.content.trim();
+  if (!title || !content) throw new Error("invalid-idea-draft");
+  return { title, content };
+}
 function tagPath(tag: Tag, tags: Tag[]) { const parent = tags.find((item) => item.id === tag.parentId); return parent ? `${parent.name} / ${tag.name}` : tag.name; }
 
 export default function Home() {
@@ -62,8 +72,19 @@ function Mark() { return <span className="mark"><i /><i /><i /></span>; }
 
 function Explore({ llmConfig, onOpenModelSettings, onCreateIdea, onContinue, hasProject }: { llmConfig: LlmConfig; onOpenModelSettings: () => void; onCreateIdea: (input: Omit<Idea, "id" | "createdAt" | "updatedAt">) => void; onContinue: () => void; hasProject: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: "你不需要现在就知道自己想做什么。告诉我最近在意、好奇或放不下的事，我们一起把它慢慢说清楚。" }]);
-  const [chatInput, setChatInput] = useState(""); const [replying, setReplying] = useState(false); const [error, setError] = useState("");
-  const saveIdea = (content: string) => onCreateIdea({ title: ideaTitle(content), content: content.trim(), tagIds: [], status: "inbox" });
+  const [chatInput, setChatInput] = useState(""); const [replying, setReplying] = useState(false); const [error, setError] = useState(""); const [savingIdeaIndex, setSavingIdeaIndex] = useState<number | null>(null); const [saveError, setSaveError] = useState("");
+  const saveIdea = async (index: number) => {
+    if (savingIdeaIndex !== null) return;
+    const transcript = messages.slice(Math.max(0, index - 7), index + 1).map((message) => `${message.role === "user" ? "用户" : "Ariadne"}：${message.content}`).join("\n\n");
+    setSavingIdeaIndex(index); setSaveError("");
+    try {
+      const answer = await askLlm(llmConfig, "你是 Ariadne 的想法整理助手。请把对话中用户想尝试的方向整理成一条可以保存、也可以直接转为项目的想法。只输出严格 JSON，不要输出 Markdown 或解释，格式为：{\"title\":\"简洁明确的标题\",\"content\":\"项目内容介绍\"}。标题使用 8—22 个中文字符，概括用户真正想做的事；内容介绍使用 2—4 句话，说明想做什么、缘由或价值，以及对话中已经提到的初步方向。保留用户原意，不虚构目标、时间、资源或承诺。", [{ role: "user", content: `请整理截至所选回复为止的对话：\n\n${transcript}` }], 0.2);
+      const organized = parseOrganizedIdea(answer);
+      onCreateIdea({ ...organized, tagIds: [], status: "inbox" });
+    } catch {
+      setSaveError("AI 暂时没能整理好这条想法，请稍后再试；原对话仍然保留。");
+    } finally { setSavingIdeaIndex(null); }
+  };
   const send = async (preset?: string) => {
     const content = (preset ?? chatInput).trim(); if (!content || replying) return;
     if (!llmConfig.apiKey.trim()) { setError("先在「我的 → 模型」中接入你的 API Key，就可以开始对话。"); return; }
@@ -72,7 +93,7 @@ function Explore({ llmConfig, onOpenModelSettings, onCreateIdea, onContinue, has
     catch (requestError) { setError(requestError instanceof Error && requestError.message === "missing-key" ? "还没有配置 API Key。" : "这次没有连上模型，请检查 API Key、接口地址、模型名称和账户额度。"); }
     finally { setReplying(false); }
   };
-  return <div className="explore explore-chat llm-explore"><div className="explore-conversation">{messages.map((message, index) => <div className={`explore-message ${message.role}`} key={`${message.role}-${index}`}><div className="chat-avatar">{message.role === "assistant" ? "A" : "我"}</div><div><div className="eyebrow">{message.role === "assistant" ? "ARIADNE" : "YOU"}</div><p>{message.content}</p>{message.role === "assistant" && index > 0 && <button className="save-as-idea" onClick={() => saveIdea(message.content)}><Lightbulb size={14} />保存为想法</button>}</div></div>)}{replying && <div className="explore-message assistant thinking"><div className="chat-avatar">A</div><p>正在想一想…</p></div>}</div>{messages.length === 1 && <><p className="chat-question">此刻，哪一句更接近你？</p><div className="chat-options"><button onClick={() => send("我不知道自己想做什么，请陪我找一个可以开始的方向。")}>我不知道应该做什么 <ChevronRight size={17} /></button><button onClick={() => send("我有一个还很模糊的新想法，想和你一起把它说清楚。")}>我有一个模糊的想法 <ChevronRight size={17} /></button><button className={!hasProject ? "placeholder-choice" : ""} disabled={!hasProject} onClick={onContinue}>我想继续推进之前的事情 <ChevronRight size={17} /></button></div></>}<form className="chat-composer" onSubmit={(event) => { event.preventDefault(); send(); }}><input value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="告诉我你最近在想什么…" /><button type="submit" disabled={!chatInput.trim() || replying}><ArrowUp size={18} /></button></form>{error && <div className="llm-error"><span>{error}</span><button onClick={onOpenModelSettings}>去配置 <ArrowRight size={14} /></button></div>}<p className="chat-footnote">对话由你在“我的”中接入的模型生成；满意的回答可以保存为想法。</p></div>;
+  return <div className="explore explore-chat llm-explore"><div className="explore-conversation">{messages.map((message, index) => <div className={`explore-message ${message.role}`} key={`${message.role}-${index}`}><div className="chat-avatar">{message.role === "assistant" ? "A" : "我"}</div><div><div className="eyebrow">{message.role === "assistant" ? "ARIADNE" : "YOU"}</div><p>{message.content}</p>{message.role === "assistant" && index > 0 && <button className="save-as-idea" disabled={savingIdeaIndex !== null} aria-busy={savingIdeaIndex === index} onClick={() => saveIdea(index)}><Lightbulb size={14} />{savingIdeaIndex === index ? "AI 正在整理…" : "保存为想法"}</button>}</div></div>)}{replying && <div className="explore-message assistant thinking"><div className="chat-avatar">A</div><p>正在想一想…</p></div>}</div>{saveError && <div className="llm-error idea-save-error"><span>{saveError}</span><button onClick={() => setSaveError("")}>知道了 <X size={14} /></button></div>}{messages.length === 1 && <><p className="chat-question">此刻，哪一句更接近你？</p><div className="chat-options"><button onClick={() => send("我不知道自己想做什么，请陪我找一个可以开始的方向。")}>我不知道应该做什么 <ChevronRight size={17} /></button><button onClick={() => send("我有一个还很模糊的新想法，想和你一起把它说清楚。")}>我有一个模糊的想法 <ChevronRight size={17} /></button><button className={!hasProject ? "placeholder-choice" : ""} disabled={!hasProject} onClick={onContinue}>我想继续推进之前的事情 <ChevronRight size={17} /></button></div></>}<form className="chat-composer" onSubmit={(event) => { event.preventDefault(); send(); }}><input value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="告诉我你最近在想什么…" /><button type="submit" disabled={!chatInput.trim() || replying}><ArrowUp size={18} /></button></form>{error && <div className="llm-error"><span>{error}</span><button onClick={onOpenModelSettings}>去配置 <ArrowRight size={14} /></button></div>}<p className="chat-footnote">保存时，AI 会自动整理标题和可直接用于项目的内容介绍。</p></div>;
 }
 
 function Ideas({ ideas, tags, projects, selectedIdeaId, onSelectIdea, onCreateIdea, onUpdateIdea, onDeleteIdea, onUpdateTags, onOpenProject, onCreateProject }: { ideas: Idea[]; tags: Tag[]; projects: Project[]; selectedIdeaId: string | null; onSelectIdea: (id: string | null) => void; onCreateIdea: (input: Omit<Idea, "id" | "createdAt" | "updatedAt">) => void; onUpdateIdea: (idea: Idea) => void; onDeleteIdea: (id: string) => void; onUpdateTags: (tags: Tag[]) => void; onOpenProject: (id: string) => void; onCreateProject: (idea: Idea) => void }) {

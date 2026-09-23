@@ -40,6 +40,9 @@
 .model-save-row p { display: flex; align-items: flex-start; gap: 7px; max-width: 520px; margin: 0; color: #8a8178; font: 12px/1.6 ui-sans-serif, sans-serif; }
 .model-save-row p svg { flex: none; margin-top: 2px; }
 
+.save-as-idea:disabled { cursor: wait; opacity: .62; }
+.idea-save-error { margin: 18px 0 0; }
+
 .record-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
 .record-toolbar .record-range { margin: 0; }
 .calendar-form { grid-template-columns: 1.5fr repeat(5, minmax(110px, .7fr)); }
