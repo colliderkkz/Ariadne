@@ -1,0 +1,39 @@
+/* Keep the original visual language; only make content sections flow top to bottom. */
+.choices,
+.tag-tree,
+.profile-summary,
+.profilegrid,
+.record-charts,
+.calendar-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.choices,
+.tag-manager,
+.profile-summary,
+.profilegrid,
+.record-charts,
+.calendar-layout {
+  max-width: 820px;
+}
+
+.settings,
+.data-card,
+.interest-card,
+.recent-card {
+  grid-column: auto;
+}
+
+.profile-summary > section,
+.profilegrid > section,
+.record-charts > section,
+.tag-tree > section {
+  width: 100%;
+}
+
+.focus-card,
+.archive-teaser,
+.model-teaser,
+.profilegrid section {
+  min-height: 0;
+}

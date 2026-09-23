@@ -7,6 +7,7 @@ import "./project-overview.css";
 import "./profile.css";
 import "./records.css";
 import "./enhancements.css";
+import "./vertical-flow.css";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Archive, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Compass, Eye, EyeOff, KeyRound, Lightbulb, Menu, Pencil, Play, Plus, Search, Square, Timer, Trash2, UserRound, X } from "lucide-react";
 import { createActivityRecord, createIdea, createProject, createProjectMessage, createTag, getActiveTimer, getActivityRecords, getIdeas, getLlmConfig, getProjectMessages, getProjects, getTags, saveActiveTimer, saveActivityRecords, saveIdeas, saveLlmConfig, saveProjectMessages, saveProjects, saveTags, type ActiveTimer, type ActivityRecord, type Idea, type LlmConfig, type Project, type ProjectMessage, type Tag } from "@/lib/storage";
