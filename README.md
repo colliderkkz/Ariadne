@@ -1,3 +1,11 @@
+# Ariadne
+
+## Python 后端学习入口
+
+新增的独立后端位于 [`backend/`](backend/README.md)，使用 Python、FastAPI、REST API、PostgreSQL、SQLAlchemy 和 JWT 认证。中文教程包含安装、数据库迁移、注册登录、想法 CRUD、权限隔离、测试和源码阅读顺序。前端目前仍使用 localStorage，尚未切换到新 API。
+
+以下为原有前端运行与托管说明。
+
 # vinext-starter
 
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
