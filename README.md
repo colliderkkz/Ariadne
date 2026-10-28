@@ -1,5 +1,7 @@
 # Ariadne：Next.js → FastAPI → PostgreSQL
 
+一个把想法记录、AI 对话和项目推进连接起来的个人工作区。你可以从探索一个念头开始，整理成想法，再创建项目并持续记录进展。
+
 业务数据全部通过 FastAPI 存入 PostgreSQL。默认前端使用原生 Next.js；Cloudflare/Sites 构建入口作为可选部署方式保留，数据库不使用 D1。
 
 ## 本地启动（PowerShell）
@@ -9,7 +11,7 @@
 ### 首次准备后端
 
 ```powershell
-cd M:\Ariadne\ariadne\backend
+cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock
 .\.venv\Scripts\python.exe -m pip install --no-deps -e .
@@ -24,21 +26,21 @@ docker compose up -d --wait db
 后端终端：
 
 ```powershell
-cd M:\Ariadne\ariadne\backend
+cd backend
 .\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --reload --host 127.0.0.1 --port 8000
 ```
 
 前端另开终端：
 
 ```powershell
-cd M:\Ariadne\ariadne
+# 在仓库根目录
 npm ci
 npm run dev
 ```
 
 打开 <http://127.0.0.1:3000>，注册并登录。接口文档 <http://127.0.0.1:8000/docs>。
 
-前端 API 默认地址是 `http://127.0.0.1:8000`；需要修改时，在 `ariadne/.env.local` 配置 `NEXT_PUBLIC_API_BASE_URL`，并在后端 `CORS_ORIGINS` 中配置前端来源。公开变量只存 API 地址，不能存密钥。Linux/macOS 将 Python 命令替换为 `./.venv/bin/python`。
+前端 API 默认地址是 `http://127.0.0.1:8000`；需要修改时，在仓库根目录的 `.env.local` 配置 `NEXT_PUBLIC_API_BASE_URL`，并在后端 `CORS_ORIGINS` 中配置前端来源。公开变量只存 API 地址，不能存密钥。Linux/macOS 将 Python 命令替换为 `./.venv/bin/python`。
 
 ## 最终架构
 
@@ -118,14 +120,14 @@ LLM_MODEL=deepseek-chat
 ## 验证命令
 
 ```powershell
-cd M:\Ariadne\ariadne\backend
+cd backend
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m pytest tests/test_postgres.py -q
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format --check .
 .\.venv\Scripts\python.exe -m alembic check
 
-cd M:\Ariadne\ariadne
+cd ..  # 返回仓库根目录
 npm run lint
 npm run typecheck
 npm run build
@@ -138,7 +140,7 @@ npm run test:e2e
 
 ## Git 与清理
 
-仓库根目录已统一为 `M:\Ariadne`；保留内层完整历史、外层历史分支与两份已校验 bundle，见 [Git 恢复说明](../docs/git-history.md)。原产品文档保留。
+应用与后端代码在同一仓库中；本地环境文件、构建产物和测试输出不会提交到 Git。
 
 移除了 D1/Drizzle 应用代码、绑定、生成命令与依赖，删除旧部署压缩包、日志、过期构建产物。新构建产物和测试截图均被忽略。`build/` 是构建插件源码，保留。
 
